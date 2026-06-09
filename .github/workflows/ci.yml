@@ -1,0 +1,110 @@
+# CI pipeline for homelab-llm — minimal viable secret-scan + lint + script validation.
+# 3 parallel jobs, no business logic embedded (rule R5: orchestration only).
+# Every action pinned to verified upstream SHA (rule R7).
+---
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  # ---------------------------------------------------------------------------
+  # secret-scan: runs gitleaks. Fail immediately on any commit containing
+  # high-confidence secrets (rule R2).
+  # ---------------------------------------------------------------------------
+  secret-scan:
+    name: Secret scanning (gitleaks)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
+        with:
+          fetch-depth: 0  # gitleaks needs full history to scan past commits
+      - name: Run gitleaks
+        uses: gitleaks/gitleaks-action@e0c47f4f8be36e29cdc102c57e68cb5cbf0e8d1e  # v3.0.0
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+  # ---------------------------------------------------------------------------
+  # lint: single source of truth is pre-commit (same hooks run locally before push).
+  # ---------------------------------------------------------------------------
+  lint:
+    name: Lint (pre-commit hooks)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
+      - name: Set up Python
+        uses: actions/setup-python@a309ff8b426b58ec0e2a45f0f869d46889d02405  # v6.2.0
+        with:
+          python-version: '3.12'
+      - name: Cache pre-commit hooks
+        uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae  # v5.0.5
+        with:
+          path: ~/.cache/pre-commit
+          key: pre-commit-${{ runner.os }}-${{ hashFiles('.pre-commit-config.yaml') }}
+          restore-keys: pre-commit-${{ runner.os }}-
+      - name: Install pre-commit
+        run: pip install pre-commit==4.0.1
+      - name: Install system-level hook binaries
+        # Two hooks (markdownlint, dotenv-linter) use `language: system` because
+        # their npm/Docker variants conflict with our local Node version (see
+        # `.pre-commit-config.yaml` rationale). The ubuntu-24.04 runner does not
+        # ship them, so install via apt + npm here. Versions pinned to the same
+        # ones used in local dev (markdownlint-cli 0.48, dotenv-linter 4.0.0).
+        run: |
+          set -euo pipefail
+          # markdownlint-cli via npm (CI runner has Node 22)
+          sudo npm install -g markdownlint-cli@0.48.0
+          # dotenv-linter via official install script, pinned to v4.0.0
+          curl -fsSL https://raw.githubusercontent.com/dotenv-linter/dotenv-linter/master/install.sh \
+            | sudo sh -s -- -b /usr/local/bin v4.0.0
+          # Verify both are reachable
+          markdownlint --version
+          dotenv-linter --version
+      - name: Run pre-commit on all files
+        run: pre-commit run --all-files --show-diff-on-failure
+
+  # ---------------------------------------------------------------------------
+  # scripts-validate — extra checks for the shell-heavy parts of this repo.
+  # Validates: syntax, set -euo pipefail presence, shellcheck severity.
+  # ---------------------------------------------------------------------------
+  scripts-validate:
+    name: Scripts validate (syntax + safety prelude)
+    runs-on: ubuntu-24.04
+    steps:
+      - name: Checkout
+        uses: actions/checkout@9f698171ed81b15d1823a05fc7211befd50c8ae0  # v6.0.3
+      - name: Bash syntax check
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r -d '' file; do
+            if ! bash -n "$file"; then
+              echo "::error file=$file::bash syntax error"
+              fail=1
+            fi
+          done < <(find scripts tests -type f -name '*.sh' -print0)
+          exit "$fail"
+      - name: Verify set -euo pipefail in every executable shell script
+        # Library files under scripts/lib/ and tests/lib/ are sourced by other
+        # scripts, never executed standalone. They must NOT carry their own
+        # `set -euo pipefail` because that would override the caller's options.
+        # The check therefore excludes those library directories.
+        run: |
+          set -euo pipefail
+          fail=0
+          while IFS= read -r -d '' file; do
+            if ! grep -qE '^set -[a-zA-Z]*e[a-zA-Z]*u[a-zA-Z]*o pipefail|^set -euo pipefail' "$file"; then
+              echo "::error file=$file::missing 'set -euo pipefail' safety prelude"
+              fail=1
+            fi
+          done < <(find scripts tests -type f -name '*.sh' \
+                     -not -path '*/lib/*' -print0)
+          exit "$fail"

@@ -1,0 +1,20 @@
+# Dependabot — automated GitHub Actions updates (rule R10 in docs/compliance-checklist.md)
+# Auto-updates GitHub Actions to keep CI dependencies current.
+# Renovate or semantic-release escalation deferred to v0.2 (see docs/roadmap.md).
+---
+version: 2
+updates:
+  - package-ecosystem: "github-actions"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "09:00"
+      timezone: "Europe/Madrid"
+    commit-message:
+      prefix: "ci"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "ci"
+    open-pull-requests-limit: 5

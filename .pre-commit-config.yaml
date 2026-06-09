@@ -1,0 +1,108 @@
+# Pre-commit configuration for homelab-llm. Hooks pinned to upstream SHAs for
+# deterministic builds (rule R7 in compliance-checklist.md).
+#
+# Install:        pre-commit install --install-hooks
+# Run all:        pre-commit run --all-files
+# Update SHAs:    pre-commit autoupdate (verify each SHA against upstream tag before committing)
+#
+# IMPORTANT (rule R7 in compliance-checklist.md — deterministic versioning):
+# Every hook is pinned to a verified upstream SHA, NOT a floating tag like @main.
+# When updating, resolve the new tag with: gh api /repos/<owner>/<repo>/git/ref/tags/<tag> --jq .object.sha
+---
+default_install_hook_types: [pre-commit, commit-msg]
+
+repos:
+  # --- Base hygiene (whitespace, EOF, large files, merge markers) ---
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: cef0300fd0fc4d2a87a85fa2093c6b283ea36f4b  # v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: ['--maxkb=500']
+      - id: check-merge-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: check-executables-have-shebangs
+      - id: check-shebang-scripts-are-executable
+
+  # --- Secret scanning (rule R2 in compliance-checklist.md — secret scanning) ---
+  - repo: https://github.com/gitleaks/gitleaks
+    rev: 83d9cd684c87d95d656c1458ef04895a7f1cbd8e  # v8.30.1
+    hooks:
+      - id: gitleaks
+
+  # --- YAML linting (yamllint, semantic) ---
+  - repo: https://github.com/adrienverge/yamllint
+    rev: cba56bcde1fdd01c1deb3f945e69764c291a6530  # v1.38.0
+    hooks:
+      - id: yamllint
+        args: ['-c', '.yamllint.yaml']
+
+  # --- GitHub Actions semantic linting (catches what yamllint cannot) ---
+  - repo: https://github.com/rhysd/actionlint
+    rev: 914e7df21a07ef503a81201c76d2b11c789d3fca  # v1.7.12
+    hooks:
+      - id: actionlint
+
+  # --- Markdown linting (consistent style, catches broken structure) ---
+  # NOTE: using `language: system` to invoke a brew/apt-installed markdownlint
+  # binary instead of npm-installing it inside pre-commit. Reason: pre-commit's
+  # node env vendors transitive dev-deps (ava@6.x) that exclude Node 21 LTS-odd
+  # via package.json engines. CI installs markdownlint-cli explicitly before
+  # `pre-commit run` so the hook works in both environments. This is a documented
+  # deviation from rule R7 (strict SHA-pinning): the version is pinned via the package
+  # manager (brew/apt), not the pre-commit-hooks repo SHA. Re-evaluate if the
+  # ava engine constraint is relaxed upstream.
+  - repo: local
+    hooks:
+      - id: markdownlint
+        name: markdownlint
+        description: Lint Markdown files (system markdownlint binary)
+        entry: markdownlint
+        language: system
+        types: [markdown]
+        args: ['--config', '.markdownlint.yaml']
+
+  # --- Shell linting (POSIX correctness, common bugs) ---
+  - repo: https://github.com/shellcheck-py/shellcheck-py
+    rev: 745eface02aef23e168a8afb6b5737818efbea95  # v0.11.0.1
+    hooks:
+      - id: shellcheck
+        # -x follows source statements; --source-path=SCRIPTDIR resolves
+        # `# shellcheck source=…` directives relative to the file being scanned
+        # (instead of the cwd), which is what we need for tests/lib/assert.sh
+        # and scripts/lib/common.sh references. SC1091 stays informational and
+        # doesn't fail the build (severity warning).
+        args: ['-x', '--source-path=SCRIPTDIR', '--severity=warning']
+
+  # --- Shell formatting (consistent style for scripts/) ---
+  - repo: https://github.com/scop/pre-commit-shfmt
+    rev: 05c1426671b9237fb5e1444dd63aa5731bec0dfb  # v3.13.1-1
+    hooks:
+      - id: shfmt
+        args: ['-i', '2', '-ci', '-bn']  # 2-space indent, indent case, binary on next line
+
+  # --- .env / dotenv files ---
+  # NOTE: using `language: system` to invoke brew/apt-installed dotenv-linter.
+  # The official pre-commit hook is docker-image based and requires Docker on
+  # the runner; we want hooks to run on a vanilla Mac/Linux without Docker.
+  # Same documented deviation from rule R7 strict SHA-pinning as markdownlint above.
+  - repo: local
+    hooks:
+      - id: dotenv-linter
+        name: dotenv-linter
+        description: Lint .env files (system dotenv-linter binary)
+        # v4+ requires the `check` subcommand; older docs show bare invocation.
+        entry: dotenv-linter check
+        language: system
+        files: '\.env(\..+)?(\.example)?$'
+        pass_filenames: true
+
+  # --- Conventional Commits (conventionalcommits.org) — mandatory per CONTRIBUTING.md ---
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: 3db014c16a9d31997ab8c07a4d61fcce936c8f0d  # v4.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args: []  # default types: feat, fix, chore, docs, style, refactor, perf, test, build, ci, revert

@@ -1,0 +1,25 @@
+# gitleaks config — secret scanning (rule R2 in docs/compliance-checklist.md)
+# Default ruleset is sufficient; this file documents allowlist exceptions.
+
+title = "homelab-llm gitleaks config"
+
+[extend]
+# Inherit the default ruleset (api keys, AWS, GCP, generic high-entropy, etc.)
+useDefault = true
+
+[[allowlists]]
+description = "Documentation files use placeholder credentials and example values"
+paths = [
+  '''docs/case-study-hidra\.md''',
+  '''docs/decisions/.*\.md''',
+  '''README\.md''',
+  '''\.env\.example''',
+]
+regexes = [
+  # Placeholder API keys in examples
+  '''sk-(example|placeholder|REDACTED|xxxxx).*''',
+  # RFC 5737 documentation IPs
+  '''192\.0\.2\.\d+''',
+  # Example MAC placeholder
+  '''XX:XX:XX:XX:XX:XX''',
+]

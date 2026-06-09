@@ -1,0 +1,29 @@
+# yamllint config for homelab-llm
+# Reference: https://yamllint.readthedocs.io/en/stable/configuration.html
+---
+extends: default
+
+rules:
+  # Line length: align with markdownlint
+  line-length:
+    max: 120
+    level: warning
+
+  # Truthy: GitHub Actions uses 'on:' which yamllint flags as truthy
+  truthy:
+    allowed-values: ['true', 'false', 'on', 'off']
+    check-keys: true
+
+  # Document start: not strict for Actions workflows
+  document-start:
+    present: false
+
+  # Comments: allow tighter spacing for inline comments
+  comments:
+    min-spaces-from-content: 1
+
+  # Indentation: 2 spaces, GitHub Actions default
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false

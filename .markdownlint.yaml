@@ -1,0 +1,38 @@
+# markdownlint config for homelab-llm
+# Reference: https://github.com/DavidAnson/markdownlint/blob/main/doc/Rules.md
+---
+default: true
+
+# MD013 — Line length
+# Disabled for this repo. Rationale: technical docs use soft-wrap (one paragraph
+# per line, editor wraps visually). Hard-wrapping prose at 80/120 chars makes
+# diffs noisy and rebases conflict-prone. Headings are short by convention; we
+# don't need a linter for that. Code blocks already have natural boundaries.
+MD013: false
+
+# MD060 — Table column style: compact-style insists on no surrounding spaces in
+# pipe rows, which conflicts with the more readable padded style most authors
+# use. Disabled — tabular data should be readable in raw form.
+MD060: false
+
+# MD033 — Allow inline HTML for diagrams and badges
+MD033:
+  allowed_elements:
+    - br
+    - sub
+    - sup
+    - kbd
+    - details
+    - summary
+    - img
+
+# MD041 — First line in file should be top-level heading: relaxed (some files start with frontmatter)
+MD041: false
+
+# MD024 — Multiple headings same content: allowed in CHANGELOG (Added/Changed/Fixed repeat)
+MD024:
+  siblings_only: true
+
+# MD046 — Code block style: prefer fenced (consistent with markdownlint default)
+MD046:
+  style: fenced

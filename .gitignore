@@ -1,0 +1,66 @@
+# --- Secrets and local environment ---
+.env
+.env.local
+.env.*.local
+*.key
+*.pem
+secrets/
+
+# --- Python ---
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+.pytest_cache/
+.coverage
+htmlcov/
+.tox/
+.venv/
+venv/
+
+# --- Node / aider sessions ---
+node_modules/
+.aider*
+.aider.input.history
+.aider.chat.history.md
+.aider.tags.cache.v3/
+
+# --- macOS ---
+.DS_Store
+.AppleDouble
+.LSOverride
+Icon
+._*
+.Spotlight-V100
+.Trashes
+
+# --- Linux ---
+*~
+.fuse_hidden*
+.directory
+.Trash-*
+
+# --- Editors ---
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.netrwhist
+
+# --- Logs and tmp ---
+*.log
+tmp/
+.tmp/
+.cache/
+
+# --- Build / coverage artifacts ---
+build/
+dist/
+coverage.xml
+.junit.xml
+
+# --- pre-commit ---
+# (Hooks installed in .git/hooks/, ignored by git already.)
